@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "test": "node --test *.test.js",
+    "flights": "node flights.js",
+    "test:flights": "node --test flights.test.js",
     "gateway": "node --require ./tracing.js gateway.js",
     "articles": "node --require ./tracing.js articles.js",
     "notifications": "node --require ./tracing.js notifications.js",
@@ -12,6 +15,7 @@
     "all": "concurrently \"npm run gateway\" \"npm run articles\" \"npm run notifications\" \"npm run users\" \"npm run payments\" \"npm run media\""
   },
   "dependencies": {
+    "protobufjs": "7.6.6",
     "@opentelemetry/api": "^1.9.0",
     "@opentelemetry/auto-instrumentations-node": "^0.52.0",
     "@opentelemetry/exporter-trace-otlp-grpc": "^0.55.0",

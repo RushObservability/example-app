@@ -3,6 +3,7 @@ const { trace, SpanStatusCode } = require('@opentelemetry/api');
 const { v4: uuidv4 } = require('uuid');
 
 const { metricsMiddleware } = require('./metrics');
+const { databaseSpanOptions, processDatabaseResult } = require('./mock-db');
 
 const tracer = trace.getTracer('articles');
 
@@ -39,7 +40,7 @@ function sleep(ms) {
 
 // Simulate DB query with realistic failure modes — creates child span
 async function dbQuery(operation, table, opts = {}) {
-  return await tracer.startActiveSpan(`db.${operation.toLowerCase()}`, async (span) => {
+  return await tracer.startActiveSpan(`${operation} ${table}`, databaseSpanOptions('postgresql', 'content', operation, table), async (span) => {
     const startMs = Date.now();
     dbConnections.active++;
 
@@ -97,6 +98,7 @@ async function dbQuery(operation, table, opts = {}) {
     }
 
     await sleep(duration);
+    processDatabaseResult();
     dbConnections.active--;
 
     const durationMs = Date.now() - startMs;
@@ -112,7 +114,7 @@ async function dbQuery(operation, table, opts = {}) {
 
 // Simulate cache operation — creates child span
 async function cacheOp(operation, key) {
-  return await tracer.startActiveSpan(`cache.${operation.toLowerCase()}`, async (span) => {
+  return await tracer.startActiveSpan(`${operation} article-cache`, databaseSpanOptions('redis', 'content-cache', operation, 'article-cache'), async (span) => {
     const duration = 1 + Math.random() * 5;
     await sleep(duration);
 

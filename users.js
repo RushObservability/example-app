@@ -3,6 +3,7 @@ const { trace, SpanStatusCode } = require('@opentelemetry/api');
 const { v4: uuidv4 } = require('uuid');
 
 const { metricsMiddleware } = require('./metrics');
+const { databaseSpanOptions, processDatabaseResult } = require('./mock-db');
 
 const tracer = trace.getTracer('users');
 
@@ -37,7 +38,7 @@ app.get('/users/:id', async (req, res) => {
   span.setAttributes({ 'user.lookup_id': userId });
 
   // Simulate DB lookup (child span)
-  const user = await tracer.startActiveSpan('db.select', async (dbSpan) => {
+  const user = await tracer.startActiveSpan('SELECT users', databaseSpanOptions('postgresql', 'identity', 'SELECT', 'users'), async (dbSpan) => {
     dbSpan.setAttributes({ 'db.system': 'postgresql', 'db.operation': 'SELECT', 'db.table': 'users' });
 
     const dbDuration = 5 + Math.random() * 30;
@@ -53,6 +54,7 @@ app.get('/users/:id', async (req, res) => {
     }
 
     const found = users.find(u => u.id === userId);
+    processDatabaseResult();
     dbSpan.setAttributes({ 'db.rows_found': found ? 1 : 0 });
     dbSpan.end();
     return found;
@@ -267,7 +269,7 @@ app.get('/users/:id/preferences', async (req, res) => {
   span.setAttributes({ 'user.id': userId });
 
   // DB lookup (child span)
-  const user = await tracer.startActiveSpan('db.select', async (dbSpan) => {
+  const user = await tracer.startActiveSpan('SELECT user_preferences', databaseSpanOptions('postgresql', 'identity', 'SELECT', 'user_preferences'), async (dbSpan) => {
     dbSpan.setAttributes({ 'db.system': 'postgresql', 'db.operation': 'SELECT', 'db.table': 'user_preferences' });
 
     console.log(`[users] SELECT preferences for user=${userId}`);
@@ -276,6 +278,7 @@ app.get('/users/:id/preferences', async (req, res) => {
     dbSpan.setAttributes({ 'db.duration_ms': Math.round(dbDuration) });
 
     const found = users.find(u => u.id === userId);
+    processDatabaseResult();
     dbSpan.setAttributes({ 'db.rows_found': found ? 1 : 0 });
     dbSpan.end();
     return found;
@@ -288,7 +291,7 @@ app.get('/users/:id/preferences', async (req, res) => {
   }
 
   // Cache read (child span)
-  await tracer.startActiveSpan('cache.get', async (cacheSpan) => {
+  await tracer.startActiveSpan('GET preferences', databaseSpanOptions('redis', 'identity-cache', 'GET', 'preferences'), async (cacheSpan) => {
     cacheSpan.setAttributes({ 'cache.system': 'redis', 'cache.key': `prefs:${userId}` });
     await sleep(2 + Math.random() * 5);
 

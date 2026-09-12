@@ -3,6 +3,7 @@ const { trace, SpanStatusCode } = require('@opentelemetry/api');
 const { v4: uuidv4 } = require('uuid');
 
 const { metricsMiddleware } = require('./metrics');
+const { databaseSpanOptions, processDatabaseResult } = require('./mock-db');
 
 const tracer = trace.getTracer('payments');
 
@@ -158,11 +159,11 @@ app.post('/payments/charge', async (req, res) => {
   }
 
   // Ledger write (child span)
-  const txn = await tracer.startActiveSpan('ledger.write', async (ledgerSpan) => {
-    ledgerSpan.setAttributes({ 'db.system': 'postgresql', 'db.operation': 'INSERT', 'db.table': 'transactions' });
+  const txn = await tracer.startActiveSpan('INSERT transactions', databaseSpanOptions('mysql', 'ledger', 'INSERT', 'transactions'), async (ledgerSpan) => {
 
     const ledgerDuration = 5 + Math.random() * 20;
     await sleep(ledgerDuration);
+    processDatabaseResult();
     ledgerSpan.setAttributes({ 'db.duration_ms': Math.round(ledgerDuration) });
 
     // Internal error (2%)
@@ -379,8 +380,7 @@ app.get('/payments/transactions/:userId', async (req, res) => {
   span.setAttributes({ 'payment.user_id': userId });
 
   // DB query (child span)
-  const userTxns = await tracer.startActiveSpan('db.select', async (dbSpan) => {
-    dbSpan.setAttributes({ 'db.system': 'postgresql', 'db.operation': 'SELECT', 'db.table': 'transactions' });
+  const userTxns = await tracer.startActiveSpan('SELECT transactions', databaseSpanOptions('mysql', 'ledger', 'SELECT', 'transactions'), async (dbSpan) => {
 
     console.log(`[payments] SELECT transactions for user=${userId}`);
     const dbDuration = 15 + Math.random() * 60;
@@ -388,6 +388,7 @@ app.get('/payments/transactions/:userId', async (req, res) => {
     dbSpan.setAttributes({ 'db.duration_ms': Math.round(dbDuration) });
 
     const txns = transactions.filter(t => t.user_id === userId);
+    processDatabaseResult();
     dbSpan.setAttributes({ 'db.rows_found': txns.length });
     dbSpan.end();
     return txns;
