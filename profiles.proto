@@ -1,0 +1,33 @@
+// CPU-only wire subset of opentelemetry-proto v1.10.0, Apache-2.0.
+// Field numbers match query-api/src/models/profile.rs. Not the v1.9 schema.
+syntax = "proto3";
+message AnyValue { string string_value = 1; }
+message KeyValue { string key = 1; AnyValue value = 2; }
+message Resource { repeated KeyValue attributes = 1; }
+message ExportProfilesServiceRequest {
+  repeated ResourceProfiles resource_profiles = 1;
+  Dictionary dictionary = 2;
+}
+message ResourceProfiles { Resource resource = 1; repeated ScopeProfiles scope_profiles = 2; }
+message ScopeProfiles { repeated Profile profiles = 2; }
+message Profile {
+  ValueType sample_type = 1;
+  repeated Sample samples = 2;
+  fixed64 time_unix_nano = 3;
+  uint64 duration_nano = 4;
+  ValueType period_type = 5;
+  int64 period = 6;
+  bytes profile_id = 7;
+}
+message ValueType { int32 type_strindex = 1; int32 unit_strindex = 2; }
+message Sample { int32 stack_index = 1; repeated int64 values = 4; }
+message Dictionary {
+  repeated Location location_table = 2;
+  repeated Function function_table = 3;
+  repeated string string_table = 5;
+  repeated Stack stack_table = 7;
+}
+message Stack { repeated int32 location_indices = 1; }
+message Location { repeated Line lines = 3; }
+message Line { int32 function_index = 1; int64 line = 2; }
+message Function { int32 name_strindex = 1; int32 filename_strindex = 3; }

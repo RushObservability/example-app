@@ -48,8 +48,21 @@ sdk.start();
 const { patchConsole } = require('./log-events');
 patchConsole();
 
-process.on('SIGTERM', () => {
-  sdk.shutdown().then(() => process.exit(0));
+const profiler = Promise.resolve().then(() => require('./profiling').startProfiling()).catch(() => {
+  console.warn('[profiling] could not start; check the profiling environment configuration');
+  return { stop: async () => {} };
 });
+let shuttingDown = false;
+async function shutdown() {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  const deadline = setTimeout(() => process.exit(1), 9000);
+  deadline.unref();
+  await (await profiler).stop();
+  await sdk.shutdown();
+  process.exit(0);
+}
+process.on('SIGTERM', shutdown);
+process.on('SIGINT', shutdown);
 
 console.log(`[tracing] ${serviceName} → ${collectorUrl} (traces + metrics)`);
